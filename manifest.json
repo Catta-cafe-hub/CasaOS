@@ -1,6 +1,6 @@
 {
     "display_name": "Casa OS (CattaHub)",
-    "name": "CasaOS",
+    "name": "casaos",
     "version": "1.0.0",
     "author": "YourName",
     "description": "Smart Phone Overlay for CattaHub System. Requires CattaHub account.",
