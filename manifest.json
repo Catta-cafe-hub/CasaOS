@@ -1,8 +1,8 @@
 {
-    "display_name": "Casa OS (CattaHub) V2",
-    "name": "casaos-v2",
-    "version": "1.0.1",
+    "display_name": "Casa OS (Smartphone UI)",
+    "name": "casaos",
+    "version": "1.2.0",
     "author": "Catta",
-    "description": "Smart Phone Overlay",
+    "description": "Premium Smart Phone Overlay for CattaHub.",
     "js": "index.js"
 }
