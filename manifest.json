@@ -1,8 +1,8 @@
 {
-    "display_name": "Casa Smartphone Ultra",
-    "name": "casa_ultra",
-    "version": "4.1.0",
+    "display_name": "Casa Smartphone OS",
+    "name": "casa-os-official",
+    "version": "1.0.5",
     "author": "Catta",
-    "description": "Premium Phone System (Clean Install)",
+    "description": "Smart Phone System for CattaHub Platform",
     "js": "index.js"
 }
