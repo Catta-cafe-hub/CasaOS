@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "author": "YourName",
     "description": "Smart Phone Overlay for CattaHub System. Requires CattaHub account.",
-    "repo": "https://github.com/YourUser/CasaOS-Extension",
+    "repo": "https://github.com/Catta-cafe-hub/CasaOS",
     "css": "style.css",
     "js": "index.js"
 }
