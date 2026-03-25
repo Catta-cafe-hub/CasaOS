@@ -1,9 +1,12 @@
-// /public/extensions/casa_v3/index.js
+// /public/extensions/casa_v4/index.js
+import { extension_settings } from "../../../extensions.js";
 
 (function() {
+    // --- 1. CONFIGURATION ---
     const SERVER_URL = "https://st-cattacafe.casa/secret-casa";
-
-    // ไอคอนที่คุณส่งมา
+    const POLLING_RATE = 2000;
+    
+    // รายชื่อไอคอนที่คุณส่งมา (ครบ 9 ตัว)
     const ICON_URLS = {
         assistant: "https://file.garden/aaWjcAB_JUBaS4Ni/iconcasaos/Robot_Assistant.png",
         phone: "https://file.garden/aaWjcAB_JUBaS4Ni/iconcasaos/Phone.png",
@@ -16,157 +19,284 @@
         settings: "https://file.garden/aaWjcAB_JUBaS4Ni/iconcasaos/Settings.png"
     };
 
-    const casaStyles = `
-        /* ปรับปุ่มให้เป็นสไตล์เดียวกับปุ่มในแถบข้อความ */
-        #casa-v3-btn { 
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 35px; 
-            height: 35px; 
-            background: rgba(255,255,255,0.1); 
-            border-radius: 8px; 
-            color: white; 
-            font-size: 20px; 
-            cursor: pointer; 
-            margin-left: 5px;
-            margin-right: 5px;
-            transition: 0.2s;
-            flex-shrink: 0; /* ป้องกันปุ่มโดนบีบ */
-        }
-        #casa-v3-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.1); }
+    let casaState = { 
+        isConnected: false, 
+        profile: null, 
+        isOpen: false, 
+        auth: { uid: null, token: null } 
+    };
 
-        /* ตัวเครื่องโทรศัพท์ยังคงลอย (Fixed) เหมือนเดิมเพื่อให้มองเห็นชัด */
-        #casa-v3-frame { 
-            position: fixed; 
-            bottom: 80px; 
-            right: 20px; 
-            width: 320px; 
-            height: 650px; 
-            background: #000; 
-            border-radius: 45px; 
-            border: 8px solid #333; 
-            z-index: 9999; 
-            display: none; 
-            overflow: hidden; 
-            font-family: sans-serif; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.9); 
-            transition: 0.3s; 
+    // --- 2. PREMIUM SMARTPHONE CSS ---
+    const casaStyles = `
+        /* ปุ่มเรียกโทรศัพท์ในแถบข้อความ */
+        #casa-v4-btn { 
+            display: none; /* ซ่อนไว้จนกว่าจะ Login */
+            align-items: center; 
+            justify-content: center;
+            width: 34px; height: 34px; 
+            background: rgba(255, 255, 255, 0.08); 
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px; 
+            color: white; font-size: 18px; 
+            cursor: pointer; 
+            margin-right: 8px; 
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            flex-shrink: 0;
+            align-self: center;
         }
-        .casa-screen { width: 100%; height: 100%; background-size: cover; background-position: center; display: flex; flex-direction: column; background-color: #222; }
-        .casa-status { display: flex; justify-content: space-between; padding: 35px 25px 5px; color: white; font-size: 13px; font-weight: bold; }
-        .casa-clock-area { text-align: center; color: white; margin-top: 30px; }
-        .casa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 25px; margin-top: 20px; }
-        .casa-app { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-        .casa-app-img { width: 60px; height: 60px; border-radius: 15px; background-size: cover; background-position: center; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
-        .casa-app-name { color: white; font-size: 11px; margin-top: 5px; text-shadow: 1px 1px 2px black; }
+        #casa-v4-btn:hover { background: #4CAF50; transform: scale(1.1); box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
+        #casa-v4-btn.connected { border-color: #4CAF50; }
+
+        /* ตัวเครื่องโทรศัพท์ */
+        #casa-v4-frame { 
+            position: fixed; bottom: 85px; right: 20px; 
+            width: 320px; height: 650px; 
+            background: #000; border-radius: 45px; 
+            border: 9px solid #282828; 
+            z-index: 9999; display: none; 
+            overflow: hidden; font-family: 'Segoe UI', sans-serif; 
+            box-shadow: 0 25px 60px rgba(0,0,0,0.9); 
+            transition: all 0.4s ease-in-out; 
+            transform: translateY(30px); opacity: 0;
+        }
+        #casa-v4-frame.open { display: block; transform: translateY(0); opacity: 1; }
+
+        .casa-screen { 
+            width: 100%; height: 100%; 
+            background-color: #1a1a1a; background-size: cover; 
+            background-position: center; display: flex; flex-direction: column; 
+            position: relative;
+        }
+
+        .casa-notch { 
+            width: 150px; height: 26px; background: #282828; 
+            margin: 0 auto; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10;
+        }
+
+        .casa-status-bar { 
+            display: flex; justify-content: space-between; 
+            padding: 35px 25px 5px; color: white; font-size: 12px; font-weight: 600; 
+        }
+
+        .casa-main-content { flex: 1; padding: 20px; display: flex; flex-direction: column; }
+
+        .casa-clock-section { margin-top: 20px; text-align: center; color: white; }
+        #casa-v4-big-time { font-size: 58px; font-weight: 200; text-shadow: 0 0 15px rgba(0,0,0,0.6); }
+        #casa-v4-date { font-size: 14px; margin-top: -5px; opacity: 0.9; }
+
+        .casa-wallet-pill {
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+            border-radius: 20px; padding: 5px 15px; margin: 15px auto;
+            color: #FFD700; font-size: 12px; border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .casa-app-grid { 
+            display: grid; grid-template-columns: repeat(3, 1fr); 
+            gap: 18px; margin-top: 25px; width: 100%;
+        }
+
+        .casa-app-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .casa-app-item:active { transform: scale(0.9); }
+
+        .casa-app-img { 
+            width: 62px; height: 62px; border-radius: 16px; 
+            background-size: cover; background-position: center; 
+            box-shadow: 0 5px 12px rgba(0,0,0,0.4);
+            border: 0.5px solid rgba(255,255,255,0.1);
+        }
+
+        .casa-app-name { 
+            color: white; font-size: 11px; margin-top: 6px; 
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8); font-weight: 500;
+        }
+
+        .casa-home-indicator { 
+            width: 110px; height: 5px; background: rgba(255,255,255,0.7); 
+            margin: 15px auto; border-radius: 10px; cursor: pointer; 
+        }
     `;
 
-    function createUI() {
-        if (document.getElementById('casa-v3-btn')) return;
+    // --- 3. CORE FUNCTIONS ---
 
-        // หาจุดที่จะแทรกปุ่ม (ปุ่ม Send ของ SillyTavern ปกติจะมี ID ว่า #send_button)
+    function injectUI() {
+        if (document.getElementById('casa-v4-btn')) return;
+
         const sendButton = document.getElementById('send_button');
-        if (!sendButton) {
-            // ถ้ายังหาปุ่ม Send ไม่เจอ (ST อาจยังโหลดไม่เสร็จ) ให้รอแล้วเรียกใหม่
-            setTimeout(createUI, 500);
-            return;
-        }
+        if (!sendButton) return;
 
-        // ฉีด CSS
+        // Inject Styles
         const styleSheet = document.createElement("style");
+        styleSheet.id = "casa-v4-styles";
         styleSheet.innerText = casaStyles;
         document.head.appendChild(styleSheet);
 
-        // สร้างปุ่ม Casa
+        // Create Button
         const btn = document.createElement('div');
-        btn.id = 'casa-v3-btn'; 
+        btn.id = 'casa-v4-btn'; 
         btn.innerHTML = '📱';
-        btn.title = "Open Casa OS";
         btn.onclick = togglePhone;
-
-        // แทรกปุ่ม Casa ไว้ข้างหน้าปุ่ม Send
         sendButton.parentNode.insertBefore(btn, sendButton);
 
-        // สร้างโครงโทรศัพท์ (ไว้ใน document.body เหมือนเดิมเพื่อให้ลอยทับทุกอย่าง)
+        // Create Phone Frame
         const phone = document.createElement('div');
-        phone.id = 'casa-v3-frame';
+        phone.id = 'casa-v4-frame';
         phone.innerHTML = `
-            <div class="casa-screen" id="casa-v3-bg">
-                <div style="width:150px; height:25px; background:#222; margin:0 auto; border-bottom-left-radius:20px; border-bottom-right-radius:20px;"></div>
-                <div class="casa-status"><span id="casa-v3-time">00:00</span><span>Cat 5G 📶</span></div>
-                <div class="casa-clock-area">
-                    <div id="casa-v3-big-clock" style="font-size:56px;">00:00</div>
-                    <div style="font-size:14px; opacity:0.8;">CattaHub Connected</div>
+            <div class="casa-screen" id="casa-v4-screen">
+                <div class="casa-notch"></div>
+                <div class="casa-status-bar">
+                    <span id="casa-v4-status-time">00:00</span>
+                    <span>Cat 5G 📶</span>
                 </div>
-                <div class="casa-grid" id="casa-v3-grid"></div>
-                <div onclick="document.getElementById('casa-v3-frame').style.display='none'" style="width:110px; height:5px; background:rgba(255,255,255,0.8); margin: auto auto 15px; border-radius:10px; cursor:pointer;"></div>
+                <div class="casa-main-content">
+                    <div class="casa-clock-section">
+                        <div id="casa-v4-big-time">00:00</div>
+                        <div id="casa-v4-date">Wednesday, 25 March</div>
+                    </div>
+                    <div class="casa-wallet-pill" id="casa-v4-wallet">💰 Loading Wallet...</div>
+                    <div class="casa-app-grid" id="casa-v4-grid"></div>
+                </div>
+                <div class="casa-home-indicator" onclick="closeCasa()"></div>
             </div>
         `;
         document.body.appendChild(phone);
+        console.log("✅ Casa OS: UI & Smartphone Injected");
     }
 
-    // --- ส่วนฟังก์ชันอื่นๆ เหมือนเดิม ---
+    function checkToken() {
+        const uid = localStorage.getItem('catta_uid');
+        const token = localStorage.getItem('catta_auth_token');
+        const btn = document.getElementById('casa-v4-btn');
 
-    function updateTime() {
-        const now = new Date();
-        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-        const t1 = document.getElementById('casa-v3-time');
-        const t2 = document.getElementById('casa-v3-big-clock');
-        if (t1) t1.innerText = timeStr;
-        if (t2) t2.innerText = timeStr;
-    }
-
-    async function togglePhone() {
-        const frame = document.getElementById('casa-v3-frame');
-        if (!frame) return;
-        if (frame.style.display === 'block') {
-            frame.style.display = 'none';
-        } else {
-            const uid = localStorage.getItem('catta_uid');
-            if (!uid) return alert("Please login CattaHub first!");
-            frame.style.display = 'block';
-            await loadData(uid);
+        if (uid && btn) {
+            btn.style.display = 'inline-flex';
+            casaState.auth = { uid, token };
+            updateClock();
+        } else if (btn) {
+            btn.style.display = 'none';
         }
     }
 
-    async function loadData(uid) {
+    async function togglePhone() {
+        const frame = document.getElementById('casa-v4-frame');
+        if (!frame) return;
+
+        if (casaState.isOpen) {
+            closeCasa();
+        } else {
+            const success = await loadServerData();
+            if (success) {
+                frame.classList.add('open');
+                casaState.isOpen = true;
+            }
+        }
+    }
+
+    async function loadServerData() {
         try {
             const res = await fetch(`${SERVER_URL}/v1/phone/init`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: uid })
+                body: JSON.stringify({ uid: casaState.auth.uid })
             });
             const data = await res.json();
             if (data.success) {
-                const bg = document.getElementById('casa-v3-bg');
-                if (bg) bg.style.backgroundImage = `url('${data.profile.wallpaper}')`;
-                renderApps();
+                renderContent(data);
+                return true;
             }
-        } catch (e) { console.error("Casa Fetch Error:", e); }
+        } catch (e) {
+            console.error("Casa Server Error:", e);
+            if (window.toastr) window.toastr.error("Casa Phone Server Offline");
+        }
+        return false;
     }
 
-    function renderApps() {
-        const grid = document.getElementById('casa-v3-grid');
+    function renderContent(data) {
+        // Wallpaper
+        const screen = document.getElementById('casa-v4-screen');
+        if (screen && data.profile.wallpaper) {
+            screen.style.backgroundImage = `url('${data.profile.wallpaper}')`;
+        }
+
+        // Wallet
+        const walletEl = document.getElementById('casa-v4-wallet');
+        if (walletEl) {
+            walletEl.innerText = `💰 ${data.wallet.balance.toFixed(2)} THB | 🥕 ${data.wallet.carrots}`;
+        }
+
+        // Apps Grid
+        const grid = document.getElementById('casa-v4-grid');
         if (!grid) return;
         grid.innerHTML = '';
+
         const apps = [
-            { n: 'Assistant', i: ICON_URLS.assistant }, { n: 'Phone', i: ICON_URLS.phone },
-            { n: 'Wallet', i: ICON_URLS.wallet }, { n: 'Camera', i: ICON_URLS.camera },
-            { n: 'App Store', i: ICON_URLS.appstore }, { n: 'Social', i: ICON_URLS.social },
-            { n: 'Gallery', i: ICON_URLS.gallery }, { n: 'Chat', i: ICON_URLS.chat },
-            { n: 'Settings', i: ICON_URLS.settings }
+            { name: 'Assistant', icon: ICON_URLS.assistant },
+            { name: 'Phone', icon: ICON_URLS.phone },
+            { name: 'Wallet', icon: ICON_URLS.wallet },
+            { name: 'Camera', icon: ICON_URLS.camera },
+            { name: 'App Store', icon: ICON_URLS.appstore },
+            { name: 'Social', icon: ICON_URLS.social },
+            { name: 'Gallery', icon: ICON_URLS.gallery },
+            { name: 'Chat', icon: ICON_URLS.chat },
+            { name: 'Settings', icon: ICON_URLS.settings }
         ];
+
         apps.forEach(app => {
-            const div = document.createElement('div');
-            div.className = 'casa-app';
-            div.innerHTML = `<div class="casa-app-img" style="background-image:url('${app.i}')"></div><div class="casa-app-name">${app.n}</div>`;
-            grid.appendChild(div);
+            const item = document.createElement('div');
+            item.className = 'casa-app-item';
+            item.onclick = () => alert(`Opening ${app.name}...`);
+            item.innerHTML = `
+                <div class="casa-app-img" style="background-image: url('${app.icon}')"></div>
+                <div class="casa-app-name">${app.name}</div>
+            `;
+            grid.appendChild(item);
         });
     }
 
-    jQuery(() => {
-        createUI();
-        setInterval(updateTime, 1000);
+    function updateClock() {
+        const now = new Date();
+        const tStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+        
+        const sTime = document.getElementById('casa-v4-status-time');
+        const bTime = document.getElementById('casa-v4-big-time');
+        const dStr = document.getElementById('casa-v4-date');
+
+        if (sTime) sTime.innerText = tStr;
+        if (bTime) bTime.innerText = tStr;
+        if (dStr) {
+            const opt = { weekday: 'long', day: 'numeric', month: 'long' };
+            dStr.innerText = now.toLocaleDateString('en-US', opt);
+        }
+    }
+
+    function closeCasa() {
+        const frame = document.getElementById('casa-v4-frame');
+        if (frame) frame.classList.remove('open');
+        casaState.isOpen = false;
+    }
+
+    // --- 4. INITIALIZATION & OBSERVER ---
+    
+    // ตั้งค่าตัวตรวจจับปุ่ม Send (MutationObserver)
+    const observer = new MutationObserver(() => {
+        if (document.getElementById('send_button') && !document.getElementById('casa-v4-btn')) {
+            injectUI();
+        }
     });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Polling สำหรับเช็คการ Login
+    setInterval(checkToken, POLLING_RATE);
+
+    // ป้องกัน Error updateScreen เก่า (ประกาศฟังก์ชันดักไว้)
+    window.updateScreen = function() { console.log("Old Script Blocked"); };
+
+    jQuery(() => {
+        injectUI();
+    });
+
+    // ส่งออกฟังก์ชันปิดให้เรียกจากภายนอกได้
+    window.closeCasa = closeCasa;
+
 })();
