@@ -1,8 +1,8 @@
 {
-    "display_name": "Casa OS (Smartphone UI)",
-    "name": "casaos",
-    "version": "1.2.0",
+    "display_name": "Casa Smartphone Ultra",
+    "name": "casa_ultra",
+    "version": "4.1.0",
     "author": "Catta",
-    "description": "Premium Smart Phone Overlay for CattaHub.",
+    "description": "Premium Phone System (Clean Install)",
     "js": "index.js"
 }
