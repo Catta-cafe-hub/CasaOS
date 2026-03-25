@@ -1,10 +1,8 @@
 {
-    "display_name": "Casa OS (CattaHub)",
-    "name": "casaos",
-    "version": "1.0.0",
-    "author": "YourName",
-    "description": "Smart Phone Overlay for CattaHub System. Requires CattaHub account.",
-    "repo": "https://github.com/Catta-cafe-hub/CasaOS",
-    "css": "style.css",
+    "display_name": "Casa OS (CattaHub) V2",
+    "name": "casaos-v2",
+    "version": "1.0.1",
+    "author": "Catta",
+    "description": "Smart Phone Overlay",
     "js": "index.js"
 }
