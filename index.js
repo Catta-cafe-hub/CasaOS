@@ -1,144 +1,134 @@
-// นำเข้าโมดูลที่จำเป็นจาก SillyTavern
-import { extension_settings } from "../../../extensions.js";
+// /public/extensions/casaos/index.js
 
-const SERVER_URL = "https://st-cattacafe.casa/secret-casa"; // ตัด / ตัวสุดท้ายออกเพื่อกันพลาดตอนต่อ string
+const SERVER_URL = "https://st-cattacafe.casa/secret-casa";
 const POLLING_RATE = 2000;
 
 let casaState = { 
     isConnected: false, 
-    profile: null, 
     isOpen: false,
     auth: { uid: null, token: null } 
 };
 
-// ฟังก์ชันสร้าง UI
-function createUI() {
-    if (document.getElementById('casa-connect-btn')) return; // กันสร้างซ้ำ
+// 1. รวม CSS ไว้ในนี้เลย เพื่อตัดปัญหาเรื่องไฟล์ style.css โหลดไม่ได้
+const casaStyles = `
+#casa-connect-btn {
+    position: fixed; bottom: 80px; right: 20px;
+    width: 50px; height: 50px; background: #222;
+    border-radius: 12px; border: 2px solid #4CAF50;
+    color: white; font-size: 24px; display: flex;
+    justify-content: center; align-items: center;
+    cursor: pointer; z-index: 9999;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+#casa-phone-frame {
+    position: fixed; bottom: 20px; right: 90px;
+    width: 300px; height: 600px;
+    background: #000; border-radius: 30px;
+    border: 8px solid #333; z-index: 9999;
+    display: none; overflow: hidden;
+    font-family: sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+#casa-phone-frame.open { display: block; }
+.casa-screen { width: 100%; height: 100%; background-size: cover; background-position: center; display: flex; flex-direction: column; }
+.casa-status-bar { display: flex; justify-content: space-between; padding: 10px 20px; color: white; font-size: 12px; }
+.casa-app-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px; }
+.casa-app-icon { width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 24px; }
+.casa-app-label { text-align: center; color: white; font-size: 10px; margin-top: 5px; }
+`;
 
-    // สร้างปุ่ม
+function createUI() {
+    if (document.getElementById('casa-connect-btn')) return;
+
+    // Inject CSS
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = casaStyles;
+    document.head.appendChild(styleSheet);
+
+    // Create Button
     const btn = document.createElement('div');
     btn.id = 'casa-connect-btn';
     btn.innerHTML = '📱';
-    btn.style.display = 'none'; // ปิดไว้ก่อนจนกว่าจะเช็ค token เจอ
     btn.onclick = togglePhone;
     document.body.appendChild(btn);
 
-    // สร้างโทรศัพท์
+    // Create Phone
     const phone = document.createElement('div');
     phone.id = 'casa-phone-frame';
     phone.innerHTML = `
         <div class="casa-screen" id="casa-screen-bg">
-            <div class="casa-notch"></div>
-            <div class="casa-status-bar"><span id="casa-time">12:00</span><span>Cat 5G</span></div>
-            <div class="casa-home-content">
-                <div style="font-size:48px;text-align:center;text-shadow:2px 2px 5px black; color:white;" id="casa-clock-big">12:00</div>
+            <div style="width:150px; height:25px; background:#333; margin:0 auto; border-bottom-left-radius:15px; border-bottom-right-radius:15px;"></div>
+            <div class="casa-status-bar"><span id="casa-time-top">00:00</span><span>Cat 5G 📶</span></div>
+            <div style="flex:1; padding:20px; color:white; text-align:center;">
+                <div id="casa-clock-big" style="font-size:48px; margin-top:20px; text-shadow:2px 2px 5px black;">00:00</div>
                 <div class="casa-app-grid" id="casa-grid"></div>
             </div>
-            <div class="casa-home-bar" id="casa-close-trigger"></div>
+            <div onclick="document.getElementById('casa-phone-frame').classList.remove('open')" style="width:100px; height:5px; background:white; margin:10px auto; border-radius:5px; cursor:pointer;"></div>
         </div>
     `;
     document.body.appendChild(phone);
-
-    // เพิ่ม Event Listener แทนการใช้ onclick ใน HTML string
-    document.getElementById('casa-close-trigger').onclick = closeCasa;
-}
-
-function checkToken() {
-    const token = localStorage.getItem('catta_auth_token');
-    const uid = localStorage.getItem('catta_uid');
-    const btn = document.getElementById('casa-connect-btn');
-
-    if (!btn) return;
-
-    if (token && uid) {
-        casaState.auth = { uid, token };
-        if (!casaState.isConnected) {
-            btn.style.display = 'flex';
-            btn.classList.add('connected');
-            casaState.isConnected = true;
-        }
-        updateClock();
-    } else {
-        btn.style.display = 'none';
-        casaState.isConnected = false;
-    }
-}
-
-async function togglePhone() {
-    const phone = document.getElementById('casa-phone-frame');
-    if (casaState.isOpen) {
-        closeCasa();
-    } else {
-        const success = await connectToServer();
-        if (success) {
-            phone.classList.add('open');
-            casaState.isOpen = true;
-        }
-    }
-}
-
-async function connectToServer() {
-    try {
-        const res = await fetch(`${SERVER_URL}/v1/phone/init`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: casaState.auth.uid })
-        });
-        const data = await res.json();
-        if (data.success) {
-            renderHomeScreen(data.profile);
-            return true;
-        }
-    } catch (e) {
-        console.error("Casa Server Error:", e);
-        // ตรวจสอบว่ามี toastr หรือยัง
-        if (window.toastr) window.toastr.error("Cannot connect to Casa Phone Server");
-    }
-    return false;
-}
-
-function renderHomeScreen(profile) {
-    const bg = document.getElementById('casa-screen-bg');
-    if (profile && profile.wallpaper) {
-        bg.style.backgroundImage = `url('${profile.wallpaper}')`;
-    }
-    
-    const grid = document.getElementById('casa-grid');
-    grid.innerHTML = '';
-    
-    const apps = [
-        { name: 'CattaNet', icon: '🌐' },
-        { name: 'Phone', icon: '📞' },
-        { name: 'Wallet', icon: '👛' },
-        { name: 'Settings', icon: '⚙️' }
-    ];
-
-    apps.forEach(app => {
-        const div = document.createElement('div');
-        div.className = 'casa-app-item'; // เพิ่ม class ให้จัดง่ายขึ้น
-        div.innerHTML = `<div class="casa-app-icon">${app.icon}</div><div class="casa-app-label">${app.name}</div>`;
-        grid.appendChild(div);
-    });
 }
 
 function updateClock() {
     const now = new Date();
     const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-    const el1 = document.getElementById('casa-time');
-    const el2 = document.getElementById('casa-clock-big');
-    if (el1) el1.innerText = timeStr;
-    if (el2) el2.innerText = timeStr;
+    
+    // 🛡️ Safety Check: เช็คก่อนว่า Element มีจริงไหมก่อนจะใส่ค่า
+    const topClock = document.getElementById('casa-time-top');
+    const bigClock = document.getElementById('casa-clock-big');
+    
+    if (topClock) topClock.innerText = timeStr;
+    if (bigClock) bigClock.innerText = timeStr;
 }
 
-function closeCasa() {
+async function togglePhone() {
     const phone = document.getElementById('casa-phone-frame');
-    if (phone) phone.classList.remove('open');
-    casaState.isOpen = false;
+    if (casaState.isOpen) {
+        phone.classList.remove('open');
+        casaState.isOpen = false;
+    } else {
+        const uid = localStorage.getItem('catta_uid');
+        if (!uid) return alert("Please login CattaHub first!");
+        
+        phone.classList.add('open');
+        casaState.isOpen = true;
+        await loadProfile(uid);
+    }
 }
 
-// ส่วนเริ่มต้นการทำงานเมื่อ SillyTavern โหลดเสร็จ
-jQuery(async () => {
+async function loadProfile(uid) {
+    try {
+        const res = await fetch(`${SERVER_URL}/v1/phone/init`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: uid })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const bg = document.getElementById('casa-screen-bg');
+            if (bg) bg.style.backgroundImage = `url('${data.profile.wallpaper}')`;
+            renderApps();
+        }
+    } catch (e) { console.error("Casa Error:", e); }
+}
+
+function renderApps() {
+    const grid = document.getElementById('casa-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const apps = [
+        { n: 'CattaNet', i: '🌐' }, { n: 'Phone', i: '📞' },
+        { n: 'Wallet', i: '👛' }, { n: 'Settings', i: '⚙️' }
+    ];
+    apps.forEach(app => {
+        const div = document.createElement('div');
+        div.innerHTML = `<div class="casa-app-icon">${app.i}</div><div class="casa-app-label">${app.n}</div>`;
+        grid.appendChild(div);
+    });
+}
+
+// เริ่มการทำงาน
+jQuery(() => {
     createUI();
-    console.log("📱 CasaOS Extension Initialized");
-    setInterval(checkToken, POLLING_RATE);
+    setInterval(updateClock, 1000);
+    console.log("📱 Casa OS Ready!");
 });
