@@ -1,8 +1,8 @@
 {
-    "display_name": "Casa Smartphone OS",
-    "name": "casa-os-official",
-    "version": "1.0.5",
+    "display_name": "Casa OS Smartphone V3",
+    "name": "casa_v3",
+    "version": "3.0.0",
     "author": "Catta",
-    "description": "Smart Phone System for CattaHub Platform",
+    "description": "New Smartphone UI with Premium Icons",
     "js": "index.js"
 }
