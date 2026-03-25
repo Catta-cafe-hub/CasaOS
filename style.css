@@ -1,0 +1,71 @@
+/* style.css */
+#casa-connect-btn {
+    position: fixed; bottom: 80px; right: 20px;
+    width: 50px; height: 50px; background: #222;
+    border-radius: 12px; border: 2px solid #4CAF50;
+    color: white; font-size: 24px; display: flex;
+    justify-content: center; align-items: center;
+    cursor: pointer; z-index: 9999;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+#casa-phone-frame {
+    position: fixed; bottom: 20px; right: 90px;
+    width: 300px; height: 600px;
+    background: #000; border-radius: 30px;
+    border: 8px solid #333; z-index: 9999;
+    display: none; /* ปิดไว้ก่อน จะเปิดเมื่อกดปุ่ม */
+    overflow: hidden;
+    font-family: sans-serif;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    transition: all 0.3s ease;
+}
+
+#casa-phone-frame.open {
+    display: block;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(100px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.casa-screen {
+    width: 100%; height: 100%;
+    background-size: cover; background-position: center;
+    display: flex; flex-direction: column;
+}
+
+.casa-notch {
+    width: 150px; height: 25px; background: #333;
+    margin: 0 auto; border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;
+}
+
+.casa-status-bar {
+    display: flex; justify-content: space-between;
+    padding: 5px 20px; color: white; font-size: 12px;
+}
+
+.casa-home-content { flex: 1; padding: 20px; }
+
+.casa-app-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 15px; margin-top: 40px;
+}
+
+.casa-app-icon {
+    width: 50px; height: 50px; background: rgba(255,255,255,0.2);
+    border-radius: 12px; display: flex; justify-content: center;
+    align-items: center; font-size: 24px; backdrop-filter: blur(5px);
+}
+
+.casa-app-label {
+    text-align: center; color: white; font-size: 10px; margin-top: 5px;
+    text-shadow: 1px 1px 2px black;
+}
+
+.casa-home-bar {
+    width: 100px; height: 5px; background: white;
+    margin: 10px auto; border-radius: 5px; cursor: pointer;
+}
