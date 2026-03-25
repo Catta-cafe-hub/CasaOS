@@ -1,6 +1,6 @@
 import { extension_settings } from "../../../extensions.js";
 
-const SERVER_URL = "https://st-cattacafe.casa/secret-casa";  
+const SERVER_URL = "https://st-cattacafe.casa/secret-casa/";  
 const POLLING_RATE = 2000;
 
 let casaState = { isConnected: false, profile: null, isOpen: false };
